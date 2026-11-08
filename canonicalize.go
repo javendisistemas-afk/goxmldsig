@@ -53,8 +53,21 @@ func MakeC14N10ExclusiveWithCommentsCanonicalizerWithPrefixList(prefixList strin
 }
 
 // Canonicalize transforms the input Element into a serialized XML document in canonical form.
+//
+// JAVENDI-FORK: builds the NSContext from el's REAL ancestors (etreeutils.NSBuildParentContext)
+// instead of assuming `el` is the document root. Without this, canonicalizing a sub-element whose
+// namespace prefix (named OR default) is declared only on an ancestor outside `el` fails with
+// "undeclared namespace prefix" (named prefix) or silently omits the needed xmlns= declaration
+// (default prefix) — see github.com/russellhaering/goxmldsig issue #66. The inclusive
+// canonicalizer (c14N10RecCanonicalizer, below) already does the ancestor-aware equivalent via
+// getParentNamespaceAndXmlAttributes/enhanceNamespaceAttributes; this mirrors that for exclusive.
 func (c *c14N10ExclusiveCanonicalizer) Canonicalize(el *etree.Element) ([]byte, error) {
-	err := etreeutils.TransformExcC14n(el, c.prefixList, c.comments)
+	ctx, err := etreeutils.NSBuildParentContext(el)
+	if err != nil {
+		return nil, err
+	}
+
+	err = etreeutils.TransformExcC14nWithContext(ctx, el, c.prefixList, c.comments)
 	if err != nil {
 		return nil, err
 	}

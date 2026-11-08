@@ -9,6 +9,21 @@ import (
 
 // TransformExcC14n transforms the passed element into xml-exc-c14n form.
 func TransformExcC14n(el *etree.Element, inclusiveNamespacesPrefixList string, comments bool) error {
+	return TransformExcC14nWithContext(NewDefaultNSContext(), el, inclusiveNamespacesPrefixList, comments)
+}
+
+// TransformExcC14nWithContext is like TransformExcC14n, but lets the caller supply the NSContext
+// to resolve prefixes against instead of assuming `el` is the document root. This lets a caller
+// canonicalize a sub-element whose namespace prefixes are only declared on an ancestor OUTSIDE
+// the subtree being canonicalized (ex.: NSBuildParentContext(el)) — TransformExcC14n alone can
+// only resolve prefixes declared on `el` itself or its own descendants.
+//
+// `declared` (what counts as "already rendered in the canonical output so far") always starts
+// empty here, regardless of `ctx`: nothing from an ancestor OUTSIDE the canonicalized subtree is
+// actually present in the output, so `el` must still declare, on itself, any namespace it
+// visibly utilizes — `ctx` only affects how a prefix RESOLVES, never whether it still needs to be
+// declared on `el`.
+func TransformExcC14nWithContext(ctx NSContext, el *etree.Element, inclusiveNamespacesPrefixList string, comments bool) error {
 	prefixes := strings.Fields(inclusiveNamespacesPrefixList)
 	prefixSet := make(map[string]struct{}, len(prefixes))
 
@@ -16,8 +31,8 @@ func TransformExcC14n(el *etree.Element, inclusiveNamespacesPrefixList string, c
 		prefixSet[prefix] = struct{}{}
 	}
 
-	ctx := NewDefaultNSContext()
-	err := transformExcC14n(ctx, ctx, el, prefixSet, comments)
+	declared := NewDefaultNSContext()
+	err := transformExcC14n(ctx, declared, el, prefixSet, comments)
 	if err != nil {
 		return err
 	}
